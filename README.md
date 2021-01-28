@@ -1,23 +1,50 @@
-<a href="https://packagist.org/packages/trace-one/composer-azure-plugin"><img src="https://poser.pugx.org/trace-one/composer-azure-plugin/d/total.svg" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/trace-one/composer-azure-plugin"><img src="https://poser.pugx.org/trace-one/composer-azure-plugin/v/stable.svg" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/trace-one/composer-azure-plugin">
-    <img src="https://poser.pugx.org/trace-one/composer-azure-plugin/license.svg" alt="License" />
-  </a>
+This is a fork from [traceone/composer-azure-plugin](https://github.com/traceone/composer-azure-plugin) where I change the namespace add fix some small bug which appeard on my side.
+
+---
 
 # Composer Azure Plugin
 Composer Azure plugin is an attempt to use Composer with Azure DevOps artifacts, via universal packages.
 
 ## Install
-Composer Azure Plugin requires [Composer 1.0.0](https://getcomposer.org/) or
-newer. It should be installed globally.
+Composer Azure Plugin requires [Composer 1.0.0](https://getcomposer.org/) or newer. It should be installed globally.
 
 ```
-$ composer global require trace-one/composer-azure-plugin
+$ composer global require marvincaspar/composer-azure-plugin
 ```
 
 You have to be logged in via the [Azure command line interface](https://docs.microsoft.com/fr-fr/cli/azure/?view=azure-cli-latest).
 
 ## Usage
+
+This plugin has two components. Publishing a composer package to azure and pulling the dependency.
+
+### Publishing a package
+
+In the package you want to publish you have to add an `azure-publish-registry` config to the `extra` block.
+
+```json
+{
+    ...
+    "extra": {
+        "azure-publish-registry": {
+            "organization": "<my-organization>",
+            "project": "<my-project-name>",
+            "feed": "<my-feed-name>"
+        }
+    }
+}
+```
+
+This plugin adds a new composer command to easily publish the package. 
+Just run `composer azure:publish` and it will remove all ignore files (e.g. the vendor folder) and publish the code to azure artifacts.
+
+### Use package as dependency
+
+To use a published package add an `azure-repositories` config to the `extra` block.
+There you define which packages are required for the current project.
+In the `required` block you then define the requirements as usual.
+The only downsite is, that you can't use constraints and set a specific version.
+
 ```json
 {
     "require": {
@@ -26,8 +53,10 @@ You have to be logged in via the [Azure command line interface](https://docs.mic
     "extra": {
         "azure-repositories": [
             {
-                "organization": "organization-name.visualstudio.com",
-                "feed": "MyFeed",
+                "organization": "<my-organization>",
+                "project": "<my-project-name>",
+                "feed": "<my-feed-name>",
+                "symlink": false,
                 "packages": [
                     "vendor-name/my-package"
                 ]
@@ -37,22 +66,9 @@ You have to be logged in via the [Azure command line interface](https://docs.mic
 }
 ```
 
-## Publishing a package
-Universal packages do not support vendor names, we then use a dot as separator. Once inside the folder of the package you want to publish, simply publish with the correct name.
-
-```
-az artifacts universal publish
-    --organization https://organization-name.visualstudio.com/
-    --feed MyFeed
-    --name vendor-name.my-package
-    --version 1.0.0
-    --description "My PHP package"
-    --path .
-```
-
 ## Known limitations
+
 This package is a very early attempt, and has a few known limitations:
 * **No version management**: the version specified into the package.json file has to be the exact required version
-* **No composer publish command**: you have to publish your packages using the default Azure CLI
 
 Feel free to suggest any improvement!

@@ -1,6 +1,6 @@
 <?php
 
-namespace TraceOne\Composer;
+namespace MarvinCaspar\Composer;
 
 use Composer\Composer;
 use Composer\IO\IOInterface;
@@ -10,7 +10,7 @@ use Composer\Plugin\Capable;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\ScriptEvents;
 
-use TraceOne\Composer\AzureRepository;
+use MarvinCaspar\Composer\AzureRepository;
 
 /**
  * @todo load packages on install/update only
@@ -19,34 +19,12 @@ use TraceOne\Composer\AzureRepository;
  */
 class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 {
-    /**
-     * 
-     */
-    protected $composer;
+    protected Composer $composer;
+    protected IOInterface $io;
+    protected string $cacheDir;
+    protected Array $repositories = [];
+    protected $requireDownload = false;
 
-    /**
-     * 
-     */
-    protected $io;
-
-    /**
-     * 
-     */
-    protected $cache_dir;
-
-    /**
-     * 
-     */
-    protected $repositories = [];
-
-    /**
-     * 
-     */
-    protected $require_download = false;
-
-    /**
-     * {@inheritdoc}
-     */
     public function activate(Composer $composer, IOInterface $io)
     {
         $extra = $composer->getPackage()->getExtra();
@@ -58,26 +36,20 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         
         $this->composer = $composer;
         $this->io = $io;
-        $this->cache_dir = str_replace(DIRECTORY_SEPARATOR, '/', $this->composer->getConfig()->get('cache-dir')) . '/azure';
+        $this->cacheDir = str_replace(DIRECTORY_SEPARATOR, '/', $this->composer->getConfig()->get('cache-dir')) . '/azure';
 
         $this->parseRequiredPackages();
         $this->fetchAzurePackages();
         $this->addAzureRepositories();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getCapabilities()
     {
         return array(
-            'Composer\Plugin\Capability\CommandProvider' => 'TraceOne\Composer\CommandProvider',
+            'Composer\Plugin\Capability\CommandProvider' => 'MarvinCaspar\Composer\CommandProvider',
         );
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public static function getSubscribedEvents()
     {
         return [
@@ -88,29 +60,18 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         ];
     }
 
-    /**
-     * Set flag to activate artifacts download from Azure
-     */
     public function requireDownload()
     {
-        $this->require_download = true;
+        $this->requireDownload = true;
     }
 
-    /**
-     * Initiate download if needed
-     */
     public function fetchAzurePackages()
     {
-        // if(!$this->require_download)
-        // {
-        //     return;
-        // }
-
         $package_count = 0;
 
-        foreach($this->repositories as $azure_repository)
+        foreach($this->repositories as $azureRepository)
         {
-            $package_count+= $azure_repository->countArtifacts();
+            $package_count+= $azureRepository->countArtifacts();
         }
 
         if($package_count == 0)
@@ -119,77 +80,82 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         }
 
         $this->io->write('');
-        $this->io->write('<info>Fecthing packages from Azure</info>');
+        $this->io->write('<info>Fetching packages from Azure</info>');
         $this->downloadAzureArtifacts();
     }
 
-    /**
-     * Parse required Azure packages
-     */
     protected function parseRequiredPackages()
     {
         $extra = $this->composer->getPackage()->getExtra();
         $requires = $this->composer->getPackage()->getRequires();
 
-        foreach($extra['azure-repositories'] as [ 'organization' => $organization, 'feed' => $feed, 'packages' => $packages ])
+        foreach($extra['azure-repositories'] as [ 'organization' => $organization, 'project' => $project, 'feed' => $feed, 'symlink' => $symlink, 'packages' => $packages ])
         {
-            $azure_repository = new AzureRepository($organization, $feed);
+            $azureRepository = new AzureRepository($organization, $project, $feed, $symlink);
 
-            foreach($packages as $package_name)
+            foreach($packages as $packageName)
             {
-                if(array_key_exists($package_name, $requires))
+                if(array_key_exists($packageName, $requires))
                 {
-                    $azure_repository->addArtifact($package_name, $requires[$package_name]->getPrettyConstraint());
+                    $azureRepository->addArtifact($packageName, $requires[$packageName]->getPrettyConstraint());
                 }
             }
 
-            $this->repositories[] = $azure_repository;
+            $this->repositories[] = $azureRepository;
         }
     }
 
-    /**
-     * Add repositories to Composer config
-     */
     protected function addAzureRepositories()
     {
         $repositories = [];
         
-        foreach($this->repositories as $azure_repository)
+        foreach($this->repositories as $azureRepository)
         {
-            $organization = $azure_repository->getOrganization();
-            $feed = $azure_repository->getFeed();
+            $organization = $azureRepository->getOrganization();
+            $feed = $azureRepository->getFeed();
+            $symlink = $azureRepository->getSymlink();
             
-            foreach($azure_repository->getArtifacts() as $artifact)
+            foreach($azureRepository->getArtifacts() as $artifact)
             {
-                array_unshift($repositories, [
-                    'type'      => 'path',
-                    'url'       => implode('/', [ $this->cache_dir, $organization, $feed, $artifact['name'], $artifact['version'] ]),
-                    'options'   => [ 'symlink' =>  false ]
-                ]);
+                // array_unshift($repositories, [
+                //     'type'      => 'path',
+                //     'url'       => implode('/', [ $this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version'] ]),
+                //     'options'   => [ 'symlink' =>  false ]
+                // ]);
+
+                $repo = $this->composer->getRepositoryManager()->createRepository(
+                    'path', 
+                    array(
+                        'url' => implode('/', [ $this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
+                        'options'   => [ 'symlink' =>  $symlink ]
+                    )
+                );
+                $this->composer->getRepositoryManager()->addRepository($repo);
             }
         }
 
-        $this->composer->getConfig()->merge(['repositories' => $repositories]);
+        // $this->composer->getConfig()->merge(['repositories' => $repositories]);
     }
 
-    /**
-     * Download artifacts
-     */
     protected function downloadAzureArtifacts()
     {
-        foreach($this->repositories as $azure_repository)
+        foreach($this->repositories as $azureRepository)
         {
-            $organization = $azure_repository->getOrganization();
-            $feed = $azure_repository->getFeed();
-            $artifacts = $azure_repository->getArtifacts();
+            $organization = $azureRepository->getOrganization();
+            $project = $azureRepository->getProject();
+            $scope = $azureRepository->getScope();
+            $feed = $azureRepository->getFeed();
+            $artifacts = $azureRepository->getArtifacts();
 
             foreach($artifacts as $artifact)
             {
-                $path = implode('/', [ $this->cache_dir, $organization, $feed, $artifact['name'], $artifact['version'] ]);
+                $path = implode('/', [ $this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version'] ]);
                 $path = str_replace('/', DIRECTORY_SEPARATOR, $path);
 
                 $command = 'az artifacts universal download';
                 $command.= ' --organization ' . 'https://' . $organization;
+                $command.= ' --project "' . $project .'"';
+                $command.= ' --scope ' . $scope;
                 $command.= ' --feed ' . $feed;
                 $command.= ' --name ' . str_replace('/', '.', $artifact['name']);
                 $command.= ' --version ' . $artifact['version'];

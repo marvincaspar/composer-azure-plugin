@@ -1,26 +1,18 @@
 {
-    "name": "trace-one/composer-azure-plugin",
-    "description": "Trace One Azure Composer plugin",
+    "name": "marvincaspar/composer-azure-plugin",
+    "description": "Azure Composer plugin",
     "version": "1.0.0",
     "type": "composer-plugin",
     "license": "MIT",
-    "keywords": [
-        "traceone",
-        "azure",
-        "composer"
-    ],
-    "authors": [
-        { "name": "François Lavaud", "email": "francois.lavaud@traceone.com" }
-    ],
     "autoload": {
         "psr-4": {
-            "TraceOne\\Composer\\": "src"
+            "MarvinCaspar\\Composer\\": "src"
         }
     },
-    "require": {    
+    "require": {
         "composer-plugin-api": "^1.1"
     },
     "extra": {
-        "class": "TraceOne\\Composer\\AzurePlugin"
+        "class": "MarvinCaspar\\Composer\\AzurePlugin"
     }
 }

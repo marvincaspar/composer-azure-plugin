@@ -1,6 +1,6 @@
 <?php
 
-namespace TraceOne\Composer;
+namespace MarvinCaspar\Composer;
 
 /**
  * 
@@ -10,7 +10,7 @@ class Helpers
     /**
      * Compress the provided directory to a zip archive
      */
-    public static function buildArchive(String $root_path)
+    public static function buildArchive(string $root_path)
     {
         $root_path = realpath($root_path);
         $archive = new \ZipArchive();
@@ -18,7 +18,7 @@ class Helpers
 
         if($archive->open($filename, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) 
         {
-            exit("Impossible d'ouvrir le fichier <$filename>\n");
+            exit("Unable to open file <$filename>\n");
         }
 
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root_path), \RecursiveIteratorIterator::LEAVES_ONLY);
@@ -40,7 +40,7 @@ class Helpers
     /**
      * Recursively delete a directory
      */
-    public static function removeDirectory(String $root_path)
+    public static function removeDirectory(string $root_path)
     {
         $dir = opendir($root_path);
         
@@ -68,7 +68,7 @@ class Helpers
     /**
      * Recursively copy a directory
      */
-    public static function copyDirectory(String $src, String $dst)
+    public static function copyDirectory(string $src, string $dst)
     { 
         $dir = opendir($src);
         @mkdir($dst);

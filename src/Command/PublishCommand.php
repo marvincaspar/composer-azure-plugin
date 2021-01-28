@@ -1,35 +1,29 @@
 <?php
 
-namespace TraceOne\Composer\Command;
+namespace MarvinCaspar\Composer\Command;
 
 use Composer\Command\BaseCommand;
+use Composer\Factory;
+use Composer\Package\RootPackage;
+use Composer\Package\PackageInterface;
+use Composer\Downloader\DownloadManager;
+use Composer\Package\Archiver\ArchiveManager;
+use Composer\Util\Filesystem;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-use TraceOne\Composer\Helpers;
+use MarvinCaspar\Composer\Helpers;
 
-/**
- * @todo Handle properly .gitignore
- */
 class PublishCommand extends BaseCommand
 {
-    /**
-     * 
-     */
-    protected $temp_dir = '../.temp';
+    protected $tempDir = '../.temp';
 
-    /**
-     * {@inheritdoc}
-     */
     protected function configure()
     {
         $this->setName('azure:publish');
         $this->setDescription('Publish this composer package to Azure DevOps.');
     }
 
-    /**
-     * {@inheritdoc}
-     */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $extra = $this->getComposer()->getPackage()->getExtra();
@@ -41,69 +35,75 @@ class PublishCommand extends BaseCommand
 
         $this->copyPackage();
         $this->cleanIgnoredFiles();
+        // $this->removeGitFolder();
         $this->sendPackage();
         $this->removeTempFiles();
 
         $output->writeln('Done.');
     }
 
-    /**
-     * 
-     */
     protected function copyPackage()
     {
-        Helpers::copyDirectory('.', $this->temp_dir);
+        Helpers::copyDirectory('.', $this->tempDir);
     }
 
-    /**
-     *
-     */
     protected function cleanIgnoredFiles()
     {
-        if(!file_exists($this->temp_dir . '/.gitignore'))
+        if(!file_exists($this->tempDir . '/.gitignore'))
         {
             return;
         }
 
-        $ignored_files = file($this->temp_dir . '/.gitignore');
+        $ignoredFiles = file($this->tempDir . '/.gitignore');
 
-        if($ignored_files === false)
+        if($ignoredFiles === false)
         {
             return;
         }
 
-        foreach($ignored_files as $ignored_file)
+        foreach($ignoredFiles as $ignoredFile)
         {
-            if(is_dir($this->temp_dir . $ignored_file))
+            if (empty(trim($ignoredFile)))
             {
-                Helpers::removeDirectory($this->temp_dir . $ignored_file);
+                continue;
+            }
+
+            $ignoredDir = $this->tempDir . trim($ignoredFile);
+            if(is_dir($ignoredDir))
+            {
+                Helpers::removeDirectory($ignoredDir);
             }
         }
     }
 
-    /*
-     *
-     */
+    protected function removeGitFolder()
+    {
+        $gitFolder = $this->tempDir . '/.git';
+        if(is_dir($gitFolder))
+        {
+            Helpers::removeDirectory($gitFolder);
+        }
+    }
+
     protected function sendPackage()
     {
         $extra = $this->getComposer()->getPackage()->getExtra();
 
         $command = 'az artifacts universal publish';
         $command.= ' --organization ' . 'https://' . $extra['azure-publish-registry']['organization'];
+        $command.= ' --project "' . $extra['azure-publish-registry']['project'] .'"';
+        $command.= ' --scope project';
         $command.= ' --feed ' . $extra['azure-publish-registry']['feed'];
         $command.= ' --name ' . str_replace('/', '.', $this->getComposer()->getPackage()->getName());
         $command.= ' --version ' . $this->getComposer()->getPackage()->getPrettyVersion();
         $command.= ' --description "' . $this->getComposer()->getPackage()->getDescription() . '"';
-        $command.= ' --path ' . $this->temp_dir;
+        $command.= ' --path ' . $this->tempDir;
 
         shell_exec($command);
     }
 
-    /**
-     * 
-     */
     protected function removeTempFiles()
     {
-        Helpers::removeDirectory($this->temp_dir);
+        Helpers::removeDirectory($this->tempDir);
     }
 }
