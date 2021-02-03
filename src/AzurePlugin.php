@@ -161,7 +161,13 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
                 $command.= ' --version ' . $artifact['version'];
                 $command.= ' --path ' . $path;
 
-                exec($command);
+                $output = array();
+                $return_var = -1;
+                exec($command, $output, $return_var);
+            
+                if ($return_var !== 0) {
+                    throw new \Exception(implode("\n", $output));
+                }
             }
         }
     }

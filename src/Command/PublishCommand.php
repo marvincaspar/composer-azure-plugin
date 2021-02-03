@@ -99,7 +99,13 @@ class PublishCommand extends BaseCommand
         $command.= ' --description "' . $this->getComposer()->getPackage()->getDescription() . '"';
         $command.= ' --path ' . $this->tempDir;
 
-        shell_exec($command);
+        $output = array();
+        $return_var = -1;
+        exec($command, $output, $return_var);
+    
+        if ($return_var !== 0) {
+            throw new \Exception(implode("\n", $output));
+        }
     }
 
     protected function removeTempFiles()
