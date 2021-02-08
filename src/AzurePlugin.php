@@ -117,25 +117,24 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
             
             foreach($azureRepository->getArtifacts() as $artifact)
             {
-                array_unshift($repositories, [
-                    'type'      => 'path',
-                    'url'       => implode('/', [ $this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version'] ]),
-                    'options'   => [ 'symlink' =>  false ]
-                ]);
+                // array_unshift($repositories, [
+                //     'type'      => 'path',
+                //     'url'       => implode('/', [ $this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version'] ]),
+                //     'options'   => [ 'symlink' =>  false ]
+                // ]);
 
-                // $repo = $this->composer->getRepositoryManager()->createRepository(
-                //     'path', 
-                //     array(
-                //         'url' => implode('/', [ $this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
-                //         'options'   => [ 'symlink' =>  $symlink ]
-                //     )
-                // );
-                // $this->composer->getRepositoryManager()->addRepository($repo);
+                $repo = $this->composer->getRepositoryManager()->createRepository(
+                    'path', 
+                    array(
+                        'url' => implode('/', [ $this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
+                        'options'   => [ 'symlink' =>  $symlink ]
+                    )
+                );
+                $this->composer->getRepositoryManager()->addRepository($repo);
             }
         }
 
-        
-        $this->composer->getConfig()->merge(['repositories' => $repositories]);
+        // $this->composer->getConfig()->merge(['repositories' => $repositories]);
     }
 
     protected function downloadAzureArtifacts()
