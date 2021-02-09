@@ -12,30 +12,27 @@ use Composer\Script\ScriptEvents;
 
 use MarvinCaspar\Composer\AzureRepository;
 
-/**
- * @todo load packages on install/update only
- * @todo handle version modifiers
- * @todo avoid redownloading cached packages
- */
 class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 {
     protected Composer $composer;
     protected IOInterface $io;
     protected string $cacheDir;
     protected Array $repositories = [];
+    protected Bool $hasAzureRepositories = true;
 
     public function activate(Composer $composer, IOInterface $io)
     {
-        $extra = $composer->getPackage()->getExtra();
-        
-        if(!isset($extra['azure-repositories']) || !is_array($extra['azure-repositories']))
-        {
-            return;
-        }
-        
         $this->composer = $composer;
         $this->io = $io;
         $this->cacheDir = str_replace(DIRECTORY_SEPARATOR, '/', $this->composer->getConfig()->get('cache-dir')) . '/azure';
+
+
+        $extra = $composer->getPackage()->getExtra();
+        if(!isset($extra['azure-repositories']) || !is_array($extra['azure-repositories']))
+        {
+            $this->hasAzureRepositories = false;
+        }
+        
     }
 
     public function getCapabilities()
@@ -60,6 +57,10 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
     public function execute()
     {
+        if (!$this->hasAzureRepositories) {
+            return;
+        }
+
         $this->parseRequiredPackages();
         $this->fetchAzurePackages();
         $this->addAzureRepositories();
@@ -67,6 +68,10 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
     public function modifyComposerLock()
     {
+        if (!$this->hasAzureRepositories) {
+            return;
+        }
+
         $sedCommand = 'sed -i -e "s|${COMPOSER_HOME_PATH}|~/.composer|g" composer.lock';
         // on macos sed needs an empty string for the i parameter
         if(strtolower(PHP_OS) === 'darwin') {
