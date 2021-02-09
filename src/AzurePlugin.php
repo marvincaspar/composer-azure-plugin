@@ -23,7 +23,6 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
     protected IOInterface $io;
     protected string $cacheDir;
     protected Array $repositories = [];
-    protected $requireDownload = false;
 
     public function activate(Composer $composer, IOInterface $io)
     {
@@ -37,10 +36,6 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         $this->composer = $composer;
         $this->io = $io;
         $this->cacheDir = str_replace(DIRECTORY_SEPARATOR, '/', $this->composer->getConfig()->get('cache-dir')) . '/azure';
-
-        $this->parseRequiredPackages();
-        $this->fetchAzurePackages();
-        $this->addAzureRepositories();
     }
 
     public function getCapabilities()
@@ -55,17 +50,42 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         return [
             // InstallerEvents::PRE_DEPENDENCIES_SOLVING   => [ [ 'fetchAzurePackages', 0 ] ],
             
-            ScriptEvents::PRE_INSTALL_CMD   => [ [ 'requireDownload', 50000 ] ],
-            ScriptEvents::PRE_UPDATE_CMD    => [ [ 'requireDownload', 50000 ] ]
+            ScriptEvents::PRE_INSTALL_CMD   => [ [ 'execute', 50000 ] ],
+            ScriptEvents::PRE_UPDATE_CMD    => [ [ 'execute', 50000 ] ],
+
+            ScriptEvents::POST_INSTALL_CMD   => [ [ 'modifyComposerLock', 50000 ] ],
+            ScriptEvents::POST_UPDATE_CMD    => [ [ 'modifyComposerLock', 50000 ] ]
         ];
     }
 
-    public function requireDownload()
+    public function execute()
     {
-        $this->requireDownload = true;
+        $this->parseRequiredPackages();
+        $this->fetchAzurePackages();
+        $this->addAzureRepositories();
     }
 
-    public function fetchAzurePackages()
+    public function modifyComposerLock()
+    {
+        $sedCommand = 'sed -i -e "s|${COMPOSER_HOME_PATH}|~/.composer|g" composer.lock';
+        // on macos sed needs an empty string for the i parameter
+        if(strtolower(PHP_OS) === 'darwin') {
+            $sedCommand = 'sed -i "" -e "s|${COMPOSER_HOME_PATH}|~/.composer|g" composer.lock';
+        }
+
+        $command = 'COMPOSER_HOME_PATH=$(composer config --list --global | grep "\[home\]" | awk \'{print $2}\' | xargs) && ' . $sedCommand;
+
+        $output = array();
+        $return_var = -1;
+        exec($command, $output, $return_var);
+    
+        if ($return_var !== 0) {
+            throw new \Exception(implode("\n", $output));
+        }
+        $this->io->write('<info>Modified composer.lock path</info>');
+    }
+
+    protected function fetchAzurePackages()
     {
         $package_count = 0;
 
