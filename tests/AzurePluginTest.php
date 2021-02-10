@@ -130,13 +130,19 @@ final class AzurePluginTest extends TestCase
 
     public function testModifyComposerLockWithAzureRepos()
     {
+        $sedCommand = 'sed -i -e "s|${COMPOSER_HOME_PATH}|~/.composer|g" composer.lock';
+        // on macos sed needs an empty string for the i parameter
+        if (strtolower(PHP_OS) === 'darwin') {
+            $sedCommand = 'sed -i "" -e "s|${COMPOSER_HOME_PATH}|~/.composer|g" composer.lock';
+        }
+
         $azurePlugin = $this->getMockBuilder(AzurePlugin::class)
             ->onlyMethods(['executeShellCmd'])
             ->getMock();
         $azurePlugin->activate($this->composerWithAzureRepos, $this->ioMock);
         $azurePlugin->expects($this->once())
             ->method('executeShellCmd')
-            ->with('COMPOSER_HOME_PATH=$(composer config --list --global | grep "\[home\]" | awk \'{print $2}\' | xargs) && sed -i "" -e "s|${COMPOSER_HOME_PATH}|~/.composer|g" composer.lock');
+            ->with('COMPOSER_HOME_PATH=$(composer config --list --global | grep "\[home\]" | awk \'{print $2}\' | xargs) && ' . $sedCommand);
 
         $azurePlugin->modifyComposerLock();
     }
