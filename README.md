@@ -1,8 +1,3 @@
-This is a fork from [traceone/composer-azure-plugin](https://github.com/traceone/composer-azure-plugin) where I change
-the namespace add fix some small bug which appeard on my side.
-
----
-
 ![Build status](https://github.com/marvincaspar/composer-azure-plugin/workflows/CI/badge.svg)
 [![codecov](https://codecov.io/gh/marvincaspar/composer-azure-plugin/branch/master/graph/badge.svg?token=DG3G63T0Q2)](https://codecov.io/gh/marvincaspar/composer-azure-plugin)
 
@@ -71,11 +66,3 @@ is, that you can't use constraints and set a specific version.
   }
 }
 ```
-
-## Known limitations
-
-This package is a very early attempt, and has a few known limitations:
-
-* **No version management**: the version specified into the package.json file has to be the exact required version
-
-Feel free to suggest any improvement!
