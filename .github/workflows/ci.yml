@@ -1,4 +1,4 @@
-name: PHP Composer
+name: CI
 
 on:
   push:
@@ -26,19 +26,22 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-php-
 
-      #      - name: Install dependencies
-      #        if: steps.composer-cache.outputs.cache-hit != 'true'
-      #        run: composer install --prefer-dist --no-progress --no-suggest
-      - name: Install dependencies
-        uses: php-actions/composer@v5
-        if: steps.composer-cache.outputs.cache-hit != 'true'
+      - name: Setup PHP with Xdebug 2.x
+        uses: shivammathur/setup-php@v2
         with:
-          php_version: 7.4
-          version: 1
-          args: --prefer-dist --no-progress --no-suggest
+          php-version: '7.4'
+          tools: composer:v1
+          coverage: xdebug2
+
+      - name: Install dependencies
+        if: steps.composer-cache.outputs.cache-hit != 'true'
+        run: composer install --prefer-dist --no-progress --no-suggest
 
       - name: Run test suite
         run: vendor/bin/phpunit
+
+      - name: Show reports folder
+        run: ls -lah ./tests/reports/
 
       - uses: codecov/codecov-action@v1
         with:
