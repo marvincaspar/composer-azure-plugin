@@ -26,9 +26,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-php-
 
+      #      - name: Install dependencies
+      #        if: steps.composer-cache.outputs.cache-hit != 'true'
+      #        run: composer install --prefer-dist --no-progress --no-suggest
       - name: Install dependencies
+        uses: php-actions/composer@v5
         if: steps.composer-cache.outputs.cache-hit != 'true'
-        run: composer install --prefer-dist --no-progress --no-suggest
+        with:
+          php_version: 7.4
+          version: 1
+          args: --prefer-dist --no-progress --no-suggest
 
       - name: Run test suite
         run: vendor/bin/phpunit
