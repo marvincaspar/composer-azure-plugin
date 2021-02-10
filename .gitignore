@@ -1,2 +1,5 @@
 /vendor
 /.idea
+
+/tests/reports
+/.phpunit.cache/

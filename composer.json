@@ -14,5 +14,9 @@
     },
     "extra": {
         "class": "MarvinCaspar\\Composer\\AzurePlugin"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5",
+        "composer/composer": "^1.1"
     }
 }

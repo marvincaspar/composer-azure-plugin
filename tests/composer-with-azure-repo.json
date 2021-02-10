@@ -1,0 +1,26 @@
+{
+  "name": "vendor/package",
+  "type": "package",
+  "version": "1.0.0",
+  "require": {
+    "vendor/azure-package": "1.0.0"
+  },
+  "extra": {
+    "azure-publish-registry": {
+      "organization": "dev.azure.com/vendor",
+      "project": "project",
+      "feed": "feed"
+    },
+    "azure-repositories": [
+      {
+        "organization": "dev.azure.com/vendor",
+        "project": "project",
+        "feed": "feed",
+        "symlink": false,
+        "packages": [
+          "vendor/azure-package"
+        ]
+      }
+    ]
+  }
+}

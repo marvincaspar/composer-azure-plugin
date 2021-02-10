@@ -1,0 +1,10 @@
+{
+  "name": "vendor/package",
+  "type": "package",
+  "version": "1.0.0",
+  "require": {
+    "vendor/other-package": "1.0.0"
+  },
+  "extra": {
+  }
+}

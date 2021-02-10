@@ -3,16 +3,9 @@
 namespace MarvinCaspar\Composer\Command;
 
 use Composer\Command\BaseCommand;
-use Composer\Factory;
-use Composer\Package\RootPackage;
-use Composer\Package\PackageInterface;
-use Composer\Downloader\DownloadManager;
-use Composer\Package\Archiver\ArchiveManager;
-use Composer\Util\Filesystem;
+use MarvinCaspar\Composer\Helpers;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-
-use MarvinCaspar\Composer\Helpers;
 
 class PublishCommand extends BaseCommand
 {
@@ -24,22 +17,21 @@ class PublishCommand extends BaseCommand
         $this->setDescription('Publish this composer package to Azure DevOps.');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $extra = $this->getComposer()->getPackage()->getExtra();
-        
-        if(!isset($extra['azure-publish-registry']) || !is_array($extra['azure-publish-registry']))
-        {
-            return;
+
+        if (!isset($extra['azure-publish-registry']) || !is_array($extra['azure-publish-registry'])) {
+            return 0;
         }
 
         $this->copyPackage();
         $this->cleanIgnoredFiles();
-        // $this->removeGitFolder();
         $this->sendPackage();
         $this->removeTempFiles();
 
         $output->writeln('Done.');
+        return 0;
     }
 
     protected function copyPackage()
@@ -49,28 +41,23 @@ class PublishCommand extends BaseCommand
 
     protected function cleanIgnoredFiles()
     {
-        if(!file_exists($this->tempDir . '/.gitignore'))
-        {
+        if (!file_exists($this->tempDir . '/.gitignore')) {
             return;
         }
 
         $ignoredFiles = file($this->tempDir . '/.gitignore');
 
-        if($ignoredFiles === false)
-        {
+        if ($ignoredFiles === false) {
             return;
         }
 
-        foreach($ignoredFiles as $ignoredFile)
-        {
-            if (empty(trim($ignoredFile)))
-            {
+        foreach ($ignoredFiles as $ignoredFile) {
+            if (empty(trim($ignoredFile))) {
                 continue;
             }
 
             $ignoredDir = $this->tempDir . trim($ignoredFile);
-            if(is_dir($ignoredDir))
-            {
+            if (is_dir($ignoredDir)) {
                 Helpers::removeDirectory($ignoredDir);
             }
         }
@@ -79,8 +66,7 @@ class PublishCommand extends BaseCommand
     protected function removeGitFolder()
     {
         $gitFolder = $this->tempDir . '/.git';
-        if(is_dir($gitFolder))
-        {
+        if (is_dir($gitFolder)) {
             Helpers::removeDirectory($gitFolder);
         }
     }
@@ -90,19 +76,24 @@ class PublishCommand extends BaseCommand
         $extra = $this->getComposer()->getPackage()->getExtra();
 
         $command = 'az artifacts universal publish';
-        $command.= ' --organization ' . 'https://' . $extra['azure-publish-registry']['organization'];
-        $command.= ' --project "' . $extra['azure-publish-registry']['project'] .'"';
-        $command.= ' --scope project';
-        $command.= ' --feed ' . $extra['azure-publish-registry']['feed'];
-        $command.= ' --name ' . str_replace('/', '.', $this->getComposer()->getPackage()->getName());
-        $command.= ' --version ' . $this->getComposer()->getPackage()->getPrettyVersion();
-        $command.= ' --description "' . $this->getComposer()->getPackage()->getDescription() . '"';
-        $command.= ' --path ' . $this->tempDir;
+        $command .= ' --organization ' . 'https://' . $extra['azure-publish-registry']['organization'];
+        $command .= ' --project "' . $extra['azure-publish-registry']['project'] . '"';
+        $command .= ' --scope project';
+        $command .= ' --feed ' . $extra['azure-publish-registry']['feed'];
+        $command .= ' --name ' . str_replace('/', '.', $this->getComposer()->getPackage()->getName());
+        $command .= ' --version ' . $this->getComposer()->getPackage()->getPrettyVersion();
+        $command .= ' --description "' . $this->getComposer()->getPackage()->getDescription() . '"';
+        $command .= ' --path ' . $this->tempDir;
 
+        $this->executeShellCmd($command);
+    }
+
+    protected function executeShellCmd(string $cmd)
+    {
         $output = array();
         $return_var = -1;
-        exec($command, $output, $return_var);
-    
+        exec($cmd, $output, $return_var);
+
         if ($return_var !== 0) {
             throw new \Exception(implode("\n", $output));
         }

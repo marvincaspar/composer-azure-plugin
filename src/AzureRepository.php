@@ -20,33 +20,32 @@ class AzureRepository
         $this->scope = "project";
     }
 
-    
-    public function getOrganization() : string 
+    public function getOrganization(): string
     {
         return $this->organization;
     }
 
-    public function getProject() : string 
+    public function getProject(): string
     {
         return $this->project;
     }
 
-    public function getScope() : string 
+    public function getScope(): string
     {
         return $this->scope;
     }
-    
-    public function getFeed() : string 
+
+    public function getFeed(): string
     {
         return $this->feed;
     }
-    
-    public function getSymlink() : bool 
+
+    public function getSymlink(): bool
     {
         return $this->symlink;
     }
 
-    public function addArtifact(string $name, string $version) : void
+    public function addArtifact(string $name, string $version): void
     {
         $this->artifacts[] = [
             'name' => $name,
@@ -54,7 +53,6 @@ class AzureRepository
         ];
     }
 
-    
     public function getArtifacts(): array
     {
         return $this->artifacts;

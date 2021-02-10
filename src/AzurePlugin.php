@@ -3,23 +3,19 @@
 namespace MarvinCaspar\Composer;
 
 use Composer\Composer;
-use Composer\IO\IOInterface;
 use Composer\EventDispatcher\EventSubscriberInterface;
-use Composer\Installer\InstallerEvents;
+use Composer\Factory;
+use Composer\IO\IOInterface;
 use Composer\Plugin\Capable;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\ScriptEvents;
-use Composer\Factory;
-
-use MarvinCaspar\Composer\AzureRepository;
 
 class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 {
     protected Composer $composer;
     protected IOInterface $io;
     protected string $cacheDir;
-    // protected Array $repositories = [];
-    protected Bool $hasAzureRepositories = true;
+    public bool $hasAzureRepositories = true;
 
     public function activate(Composer $composer, IOInterface $io)
     {
@@ -29,11 +25,9 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
 
         $extra = $composer->getPackage()->getExtra();
-        if(!isset($extra['azure-repositories']) || !is_array($extra['azure-repositories']))
-        {
+        if (!isset($extra['azure-repositories']) || !is_array($extra['azure-repositories'])) {
             $this->hasAzureRepositories = false;
         }
-        
     }
 
     public function getCapabilities()
@@ -46,17 +40,15 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
     public static function getSubscribedEvents()
     {
         return [
-            // InstallerEvents::PRE_DEPENDENCIES_SOLVING   => [ [ 'fetchAzurePackages', 0 ] ],
-            
-            ScriptEvents::PRE_INSTALL_CMD   => [ [ 'execute', 50000 ] ],
-            ScriptEvents::PRE_UPDATE_CMD    => [ [ 'execute', 50000 ] ],
+            ScriptEvents::PRE_INSTALL_CMD => [['execute', 50000]],
+            ScriptEvents::PRE_UPDATE_CMD => [['execute', 50000]],
 
-            ScriptEvents::POST_INSTALL_CMD   => [ [ 'modifyComposerLock', 50000 ] ],
-            ScriptEvents::POST_UPDATE_CMD    => [ [ 'modifyComposerLock', 50000 ] ]
+            ScriptEvents::POST_INSTALL_CMD => [['modifyComposerLock', 50000]],
+            ScriptEvents::POST_UPDATE_CMD => [['modifyComposerLock', 50000]]
         ];
     }
 
-    public function execute()
+    public function execute(): void
     {
         if (!$this->hasAzureRepositories) {
             return;
@@ -67,7 +59,7 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         $this->addAzureRepositories($azureRepositoriesWithDependencies);
     }
 
-    public function modifyComposerLock()
+    public function modifyComposerLock(): void
     {
         if (!$this->hasAzureRepositories) {
             return;
@@ -75,42 +67,32 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
         $sedCommand = 'sed -i -e "s|${COMPOSER_HOME_PATH}|~/.composer|g" composer.lock';
         // on macos sed needs an empty string for the i parameter
-        if(strtolower(PHP_OS) === 'darwin') {
+        if (strtolower(PHP_OS) === 'darwin') {
             $sedCommand = 'sed -i "" -e "s|${COMPOSER_HOME_PATH}|~/.composer|g" composer.lock';
         }
 
         $command = 'COMPOSER_HOME_PATH=$(composer config --list --global | grep "\[home\]" | awk \'{print $2}\' | xargs) && ' . $sedCommand;
 
-        $output = array();
-        $return_var = -1;
-        exec($command, $output, $return_var);
-    
-        if ($return_var !== 0) {
-            throw new \Exception(implode("\n", $output));
-        }
+        $this->executeShellCmd($command);
+
         $this->io->write('<info>Modified composer.lock path</info>');
     }
 
-    protected function parseRequiredPackages(Composer $composer): Array
+    protected function parseRequiredPackages(Composer $composer): array
     {
         $azureRepositories = [];
         $extra = $composer->getPackage()->getExtra();
         $requires = $composer->getPackage()->getRequires();
 
-        echo 'Parse required packages for ' . $composer->getPackage()->getName();
-
-        if(!isset($extra['azure-repositories'])) {
+        if (!isset($extra['azure-repositories'])) {
             return [];
         }
 
-        foreach($extra['azure-repositories'] as [ 'organization' => $organization, 'project' => $project, 'feed' => $feed, 'symlink' => $symlink, 'packages' => $packages ])
-        {
+        foreach ($extra['azure-repositories'] as ['organization' => $organization, 'project' => $project, 'feed' => $feed, 'symlink' => $symlink, 'packages' => $packages]) {
             $azureRepository = new AzureRepository($organization, $project, $feed, $symlink);
 
-            foreach($packages as $packageName)
-            {
-                if(array_key_exists($packageName, $requires))
-                {
+            foreach ($packages as $packageName) {
+                if (array_key_exists($packageName, $requires)) {
                     $azureRepository->addArtifact($packageName, $requires[$packageName]->getPrettyConstraint());
                 }
             }
@@ -121,17 +103,15 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         return $azureRepositories;
     }
 
-    protected function fetchAzurePackages(Array $azureRepositories): Array
+    protected function fetchAzurePackages(array $azureRepositories): array
     {
         $package_count = 0;
 
-        foreach($azureRepositories as $azureRepository)
-        {
-            $package_count+= $azureRepository->countArtifacts();
+        foreach ($azureRepositories as $azureRepository) {
+            $package_count += $azureRepository->countArtifacts();
         }
 
-        if($package_count == 0)
-        {
+        if ($package_count == 0) {
             return [];
         }
 
@@ -140,23 +120,19 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         return $this->downloadAzureArtifacts($azureRepositories);
     }
 
-    protected function addAzureRepositories(Array $azureRepositories)
+    protected function addAzureRepositories(array $azureRepositories)
     {
-        $repositories = [];
-        
-        foreach($azureRepositories as $azureRepository)
-        {
+        foreach ($azureRepositories as $azureRepository) {
             $organization = $azureRepository->getOrganization();
             $feed = $azureRepository->getFeed();
             $symlink = $azureRepository->getSymlink();
-            
-            foreach($azureRepository->getArtifacts() as $artifact)
-            {
+
+            foreach ($azureRepository->getArtifacts() as $artifact) {
                 $repo = $this->composer->getRepositoryManager()->createRepository(
-                    'path', 
+                    'path',
                     array(
-                        'url' => implode('/', [ $this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
-                        'options'   => [ 'symlink' =>  $symlink ]
+                        'url' => implode('/', [$this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
+                        'options' => ['symlink' => $symlink]
                     )
                 );
                 $this->composer->getRepositoryManager()->addRepository($repo);
@@ -164,42 +140,35 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         }
     }
 
-    protected function downloadAzureArtifacts(Array $azureRepositories): Array
+    protected function downloadAzureArtifacts(array $azureRepositories): array
     {
         $azureRepositoriesWithDependencies = $azureRepositories;
-        foreach($azureRepositories as $azureRepository)
-        {
+        foreach ($azureRepositories as $azureRepository) {
             $organization = $azureRepository->getOrganization();
             $project = $azureRepository->getProject();
             $scope = $azureRepository->getScope();
             $feed = $azureRepository->getFeed();
             $artifacts = $azureRepository->getArtifacts();
 
-            foreach($artifacts as $artifact)
-            {
-                $path = implode(DIRECTORY_SEPARATOR, [ $this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version'] ]);
+            foreach ($artifacts as $artifact) {
+                $path = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]);
 
                 // continue if dir already exists and it is not empty
-                if(is_dir($path) && count(scandir($path)) > 2) {
+                if (is_dir($path) && count(scandir($path)) > 2) {
                     $this->io->write('<info>Package ' . $artifact['name'] . ' already downloaded</info>');
                 } else {
 
                     $command = 'az artifacts universal download';
-                    $command.= ' --organization ' . 'https://' . $organization;
-                    $command.= ' --project "' . $project .'"';
-                    $command.= ' --scope ' . $scope;
-                    $command.= ' --feed ' . $feed;
-                    $command.= ' --name ' . str_replace('/', '.', $artifact['name']);
-                    $command.= ' --version ' . $artifact['version'];
-                    $command.= ' --path ' . $path;
+                    $command .= ' --organization ' . 'https://' . $organization;
+                    $command .= ' --project "' . $project . '"';
+                    $command .= ' --scope ' . $scope;
+                    $command .= ' --feed ' . $feed;
+                    $command .= ' --name ' . str_replace('/', '.', $artifact['name']);
+                    $command .= ' --version ' . $artifact['version'];
+                    $command .= ' --path ' . $path;
 
-                    $output = array();
-                    $return_var = -1;
-                    exec($command, $output, $return_var);
-                
-                    if ($return_var !== 0) {
-                        throw new \Exception(implode("\n", $output));
-                    }
+                    $this->executeShellCmd($command);
+
                     $this->io->write('<info>Package ' . $artifact['name'] . ' downloaded</info>');
                 }
 
@@ -209,7 +178,18 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         return $azureRepositoriesWithDependencies;
     }
 
-    protected function solveDependencies(string $packagePath) 
+    protected function executeShellCmd(string $cmd)
+    {
+        $output = array();
+        $return_var = -1;
+        exec($cmd, $output, $return_var);
+
+        if ($return_var !== 0) {
+            throw new \Exception(implode("\n", $output));
+        }
+    }
+
+    protected function solveDependencies(string $packagePath): array
     {
         $factory = new Factory();
         $composer = $factory->createComposer($this->io, implode(DIRECTORY_SEPARATOR, [$packagePath, Factory::getComposerFile()]));
