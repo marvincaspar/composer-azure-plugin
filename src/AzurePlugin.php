@@ -30,6 +30,14 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         }
     }
 
+    public function deactivate(Composer $composer, IOInterface $io)
+    {
+    }
+
+    public function uninstall(Composer $composer, IOInterface $io)
+    {
+    }
+
     public function getCapabilities()
     {
         return array(
