@@ -11,6 +11,10 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        composer: [1, 2]
+
     steps:
       - uses: actions/checkout@v2
 
@@ -30,7 +34,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '7.4'
-          tools: composer:v1
+          tools: composer:v${{ matrix.composer }}
           coverage: xdebug2
 
       - name: Install dependencies
