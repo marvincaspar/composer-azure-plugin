@@ -172,7 +172,8 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
                     $this->io->write('<info>Package ' . $artifact['name'] . ' downloaded</info>');
                 }
 
-                $azureRepositoriesWithDependencies = array_unique(array_merge($azureRepositoriesWithDependencies, $this->solveDependencies($path)));
+                $deps = $this->solveDependencies($path);
+                $azureRepositoriesWithDependencies = array_merge($azureRepositoriesWithDependencies, $deps);
             }
         }
         return $azureRepositoriesWithDependencies;
