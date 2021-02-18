@@ -17,6 +17,8 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
     protected string $cacheDir;
     public bool $hasAzureRepositories = true;
 
+    protected FileHelper $fileHelper;
+
     public function activate(Composer $composer, IOInterface $io)
     {
         $this->composer = $composer;
@@ -58,6 +60,8 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
     public function execute(): void
     {
+        $this->fileHelper = $this->getFileHelper();
+
         if (!$this->hasAzureRepositories) {
             return;
         }
@@ -65,6 +69,11 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         $azureRepositories = $this->parseRequiredPackages($this->composer);
         $azureRepositoriesWithDependencies = $this->fetchAzurePackages($azureRepositories);
         $this->addAzureRepositories($azureRepositoriesWithDependencies);
+    }
+
+    protected function getFileHelper(): FileHelper
+    {
+        return new FileHelper();
     }
 
     public function modifyComposerLock(): void
@@ -159,7 +168,7 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
             $artifacts = $azureRepository->getArtifacts();
 
             foreach ($artifacts as $artifact) {
-                $path = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]);
+                $path = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, $organization, $feed, $artifact['name'], 'tmp']);
 
                 // continue if dir already exists and it is not empty
                 if (is_dir($path) && count(scandir($path)) > 2) {
@@ -172,10 +181,16 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
                     $command .= ' --scope ' . $scope;
                     $command .= ' --feed ' . $feed;
                     $command .= ' --name ' . str_replace('/', '.', $artifact['name']);
-                    $command .= ' --version ' . $artifact['version'];
+                    $command .= ' --version \'' . $artifact['version'] . '\'';
                     $command .= ' --path ' . $path;
 
                     $this->executeShellCmd($command);
+
+                    $composer = $this->getComposer($path);
+                    $version = $composer->getPackage()->getPrettyVersion();
+
+                    $this->fileHelper->copyDirectory($path, str_replace('/tmp', $version, $path));
+                    $this->fileHelper->removeDirectory($path);
 
                     $this->io->write('<info>Package ' . $artifact['name'] . ' downloaded</info>');
                 }
@@ -200,11 +215,16 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
     protected function solveDependencies(string $packagePath): array
     {
-        $factory = new Factory();
-        $composer = $factory->createComposer($this->io, implode(DIRECTORY_SEPARATOR, [$packagePath, Factory::getComposerFile()]));
+        $composer = $this->getComposer($packagePath);
         $azureRepositories = $this->parseRequiredPackages($composer);
         $this->fetchAzurePackages($azureRepositories);
 
         return $azureRepositories;
+    }
+
+    protected function getComposer(string $path): Composer
+    {
+        $factory = new Factory();
+        return $factory->createComposer($this->io, implode(DIRECTORY_SEPARATOR, [$path, Factory::getComposerFile()]));
     }
 }

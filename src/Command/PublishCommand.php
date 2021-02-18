@@ -3,13 +3,14 @@
 namespace MarvinCaspar\Composer\Command;
 
 use Composer\Command\BaseCommand;
-use MarvinCaspar\Composer\Helpers;
+use MarvinCaspar\Composer\FileHelper;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class PublishCommand extends BaseCommand
 {
     protected $tempDir = '../.temp';
+    protected FileHelper $fileHelper;
 
     protected function configure()
     {
@@ -19,6 +20,7 @@ class PublishCommand extends BaseCommand
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->fileHelper = $this->getFileHelper();
         $extra = $this->getComposer()->getPackage()->getExtra();
 
         if (!isset($extra['azure-publish-registry']) || !is_array($extra['azure-publish-registry'])) {
@@ -34,9 +36,14 @@ class PublishCommand extends BaseCommand
         return 0;
     }
 
+    protected function getFileHelper(): FileHelper
+    {
+        return new FileHelper();
+    }
+
     protected function copyPackage()
     {
-        Helpers::copyDirectory('.', $this->tempDir);
+        $this->fileHelper->copyDirectory('.', $this->tempDir);
     }
 
     protected function cleanIgnoredFiles()
@@ -58,7 +65,7 @@ class PublishCommand extends BaseCommand
 
             $ignoredDir = $this->tempDir . trim($ignoredFile);
             if (is_dir($ignoredDir)) {
-                Helpers::removeDirectory($ignoredDir);
+                $this->fileHelper->removeDirectory($ignoredDir);
             }
         }
     }
@@ -67,7 +74,7 @@ class PublishCommand extends BaseCommand
     {
         $gitFolder = $this->tempDir . '/.git';
         if (is_dir($gitFolder)) {
-            Helpers::removeDirectory($gitFolder);
+            $this->fileHelper->removeDirectory($gitFolder);
         }
     }
 
@@ -101,6 +108,6 @@ class PublishCommand extends BaseCommand
 
     protected function removeTempFiles()
     {
-        Helpers::removeDirectory($this->tempDir);
+        $this->fileHelper->removeDirectory($this->tempDir);
     }
 }

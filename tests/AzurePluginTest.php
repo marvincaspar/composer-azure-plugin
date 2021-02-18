@@ -6,6 +6,7 @@ use Composer\IO\IOInterface;
 use Composer\Script\ScriptEvents;
 use MarvinCaspar\Composer\AzurePlugin;
 use MarvinCaspar\Composer\AzureRepository;
+use MarvinCaspar\Composer\FileHelper;
 use PHPUnit\Framework\TestCase;
 
 final class AzurePluginTest extends TestCase
@@ -91,20 +92,29 @@ final class AzurePluginTest extends TestCase
         $azureRepo->addArtifact('vendor/azure-package', '1.0.0');
 
         $azurePlugin = $this->getMockBuilder(AzurePlugin::class)
-            ->onlyMethods(['executeShellCmd', 'solveDependencies'])
+            ->onlyMethods(['executeShellCmd', 'solveDependencies', 'getComposer', 'getFileHelper'])
             ->getMock();
         $azurePlugin->activate($this->composerWithAzureRepos, $this->ioMock);
 
-
-        $path = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, 'dev.azure.com/vendor', 'feed', 'vendor/azure-package', '1.0.0']);
+        $path = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, 'dev.azure.com/vendor', 'feed', 'vendor/azure-package', 'tmp']);
         $azurePlugin->expects($this->once())
             ->method('executeShellCmd')
-            ->with('az artifacts universal download --organization https://dev.azure.com/vendor --project "project" --scope project --feed feed --name vendor.azure-package --version 1.0.0 --path ' . $path);
+            ->with('az artifacts universal download --organization https://dev.azure.com/vendor --project "project" --scope project --feed feed --name vendor.azure-package --version \'1.0.0\' --path ' . $path);
+
+        $azurePlugin->expects($this->once())
+            ->method('getComposer')
+            ->willReturn($this->composerWithAzureRepos);
 
         $azurePlugin->expects($this->once())
             ->method('solveDependencies')
             ->with($path)
             ->willReturn([]);
+
+        $helperMock = $this->getMockBuilder(FileHelper::class)
+            ->getMock();
+        $azurePlugin->expects($this->once())
+            ->method('getFileHelper')
+            ->willReturn($helperMock);
 
         $azurePlugin->execute();
     }

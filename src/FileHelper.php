@@ -2,12 +2,12 @@
 
 namespace MarvinCaspar\Composer;
 
-class Helpers
+class FileHelper
 {
     /**
      * Recursively delete a directory
      */
-    public static function removeDirectory(string $root_path)
+    public function removeDirectory(string $root_path)
     {
         $dir = opendir($root_path);
 
@@ -30,7 +30,7 @@ class Helpers
     /**
      * Recursively copy a directory
      */
-    public static function copyDirectory(string $src, string $dst)
+    public function copyDirectory(string $src, string $dst)
     {
         $dir = opendir($src);
         @mkdir($dst);

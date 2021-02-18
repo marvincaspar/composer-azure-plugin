@@ -1,22 +1,22 @@
 {
-    "name": "marvincaspar/composer-azure-plugin",
-    "description": "Azure Composer plugin",
-    "version": "1.1.0",
-    "type": "composer-plugin",
-    "license": "MIT",
-    "autoload": {
-        "psr-4": {
-            "MarvinCaspar\\Composer\\": "src"
-        }
-    },
-    "require": {
-        "composer-plugin-api": "^1.1||^2.0"
-    },
-    "extra": {
-        "class": "MarvinCaspar\\Composer\\AzurePlugin"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^9.5",
-        "composer/composer": "^1.1||^2.0"
+  "name": "marvincaspar/composer-azure-plugin",
+  "description": "Azure Composer plugin",
+  "version": "1.1.1",
+  "type": "composer-plugin",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "MarvinCaspar\\Composer\\": "src"
     }
+  },
+  "require": {
+    "composer-plugin-api": "^1.1||^2.0"
+  },
+  "extra": {
+    "class": "MarvinCaspar\\Composer\\AzurePlugin"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.5",
+    "composer/composer": "^1.1||^2.0"
+  }
 }
