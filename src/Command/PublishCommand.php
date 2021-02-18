@@ -9,7 +9,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class PublishCommand extends BaseCommand
 {
-    protected $tempDir = '../.temp';
+    protected $tempDir = '..' . DIRECTORY_SEPARATOR . '.temp';
     protected FileHelper $fileHelper;
 
     protected function configure()
@@ -48,11 +48,11 @@ class PublishCommand extends BaseCommand
 
     protected function cleanIgnoredFiles()
     {
-        if (!file_exists($this->tempDir . '/.gitignore')) {
+        if (!file_exists($this->tempDir . DIRECTORY_SEPARATOR . '.gitignore')) {
             return;
         }
 
-        $ignoredFiles = file($this->tempDir . '/.gitignore');
+        $ignoredFiles = file($this->tempDir . DIRECTORY_SEPARATOR . '.gitignore');
 
         if ($ignoredFiles === false) {
             return;
@@ -63,18 +63,19 @@ class PublishCommand extends BaseCommand
                 continue;
             }
 
-            $ignoredDir = $this->tempDir . trim($ignoredFile);
-            if (is_dir($ignoredDir)) {
-                $this->fileHelper->removeDirectory($ignoredDir);
+            $ignoredFile = trim($ignoredFile);
+            // add / if entry don't start with a /
+            if (substr($ignoredFile, 0, 1) !== "/") {
+                $ignoredFile = DIRECTORY_SEPARATOR . $ignoredFile;
             }
-        }
-    }
 
-    protected function removeGitFolder()
-    {
-        $gitFolder = $this->tempDir . '/.git';
-        if (is_dir($gitFolder)) {
-            $this->fileHelper->removeDirectory($gitFolder);
+            $ignoredFileOrDir = $this->tempDir . $ignoredFile;
+            if (is_dir($ignoredFileOrDir)) {
+                $this->fileHelper->removeDirectory($ignoredFileOrDir);
+            }
+            if (is_file($ignoredFileOrDir)){
+                $this->fileHelper->removeFile($ignoredFileOrDir);
+            }
         }
     }
 

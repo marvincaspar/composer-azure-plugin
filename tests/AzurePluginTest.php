@@ -96,10 +96,11 @@ final class AzurePluginTest extends TestCase
             ->getMock();
         $azurePlugin->activate($this->composerWithAzureRepos, $this->ioMock);
 
-        $path = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, 'dev.azure.com/vendor', 'feed', 'vendor/azure-package', 'tmp']);
+        $pathTmp = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, 'dev.azure.com/vendor', 'feed', 'vendor/azure-package', 'tmp']);
+        $pathVersion = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, 'dev.azure.com/vendor', 'feed', 'vendor/azure-package', '1.0.0']);
         $azurePlugin->expects($this->once())
             ->method('executeShellCmd')
-            ->with('az artifacts universal download --organization https://dev.azure.com/vendor --project "project" --scope project --feed feed --name vendor.azure-package --version \'1.0.0\' --path ' . $path);
+            ->with('az artifacts universal download --organization https://dev.azure.com/vendor --project "project" --scope project --feed feed --name vendor.azure-package --version \'1.0.0\' --path ' . $pathTmp);
 
         $azurePlugin->expects($this->once())
             ->method('getComposer')
@@ -107,7 +108,7 @@ final class AzurePluginTest extends TestCase
 
         $azurePlugin->expects($this->once())
             ->method('solveDependencies')
-            ->with($path)
+            ->with($pathVersion)
             ->willReturn([]);
 
         $helperMock = $this->getMockBuilder(FileHelper::class)

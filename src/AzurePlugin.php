@@ -148,7 +148,7 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
                 $repo = $this->composer->getRepositoryManager()->createRepository(
                     'path',
                     array(
-                        'url' => implode('/', [$this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
+                        'url' => implode(DIRECTORY_SEPARATOR, [$this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
                         'options' => ['symlink' => $symlink]
                     )
                 );
@@ -189,14 +189,17 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
                     $composer = $this->getComposer($path);
                     $version = $composer->getPackage()->getPrettyVersion();
 
-                    $this->fileHelper->copyDirectory($path, str_replace('/tmp', $version, $path));
+                    $newPath = str_replace(DIRECTORY_SEPARATOR . 'tmp', DIRECTORY_SEPARATOR . $version, $path);
+                    $this->fileHelper->copyDirectory($path, $newPath);
                     $this->fileHelper->removeDirectory($path);
 
+                    $path = $newPath;
                     $this->io->write('<info>Package ' . $artifact['name'] . ' downloaded</info>');
                 }
 
                 $deps = $this->solveDependencies($path);
                 $azureRepositoriesWithDependencies = array_merge($azureRepositoriesWithDependencies, $deps);
+
             }
         }
         return $azureRepositoriesWithDependencies;

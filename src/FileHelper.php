@@ -7,13 +7,13 @@ class FileHelper
     /**
      * Recursively delete a directory
      */
-    public function removeDirectory(string $root_path)
+    public function removeDirectory(string $rootPath): void
     {
-        $dir = opendir($root_path);
+        $dir = opendir($rootPath);
 
         while (false !== ($file = readdir($dir))) {
             if (($file != '.') && ($file != '..')) {
-                $full = $root_path . '/' . $file;
+                $full = $rootPath . DIRECTORY_SEPARATOR . $file;
 
                 if (is_dir($full)) {
                     self::removeDirectory($full);
@@ -24,23 +24,28 @@ class FileHelper
         }
 
         closedir($dir);
-        rmdir($root_path);
+        rmdir($rootPath);
+    }
+
+    public function removeFile(string $filePath): void
+    {
+        unlink($filePath);
     }
 
     /**
      * Recursively copy a directory
      */
-    public function copyDirectory(string $src, string $dst)
+    public function copyDirectory(string $src, string $dst): void
     {
         $dir = opendir($src);
         @mkdir($dst);
 
         while (false !== ($file = readdir($dir))) {
             if (($file != '.') && ($file != '..')) {
-                if (is_dir($src . '/' . $file)) {
-                    self::copyDirectory($src . '/' . $file, $dst . '/' . $file);
+                if (is_dir($src . DIRECTORY_SEPARATOR . $file)) {
+                    self::copyDirectory($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
                 } else {
-                    copy($src . '/' . $file, $dst . '/' . $file);
+                    copy($src . DIRECTORY_SEPARATOR . $file, $dst . DIRECTORY_SEPARATOR . $file);
                 }
             }
         }
