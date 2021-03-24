@@ -9,6 +9,7 @@ use Composer\IO\IOInterface;
 use Composer\Plugin\Capable;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\ScriptEvents;
+use Exception;
 
 class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 {
@@ -19,12 +20,15 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
     protected FileHelper $fileHelper;
 
+    protected $composerHome = '';
+    protected $shortedComposerHome = '~/.composer';
+
     public function activate(Composer $composer, IOInterface $io)
     {
         $this->composer = $composer;
         $this->io = $io;
         $this->cacheDir = str_replace(DIRECTORY_SEPARATOR, '/', $this->composer->getConfig()->get('cache-dir')) . '/azure';
-
+        $this->composerHome = $this->composer->getConfig()->get('home');
 
         $extra = $composer->getPackage()->getExtra();
         if (!isset($extra['azure-repositories']) || !is_array($extra['azure-repositories'])) {
@@ -53,8 +57,8 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
             ScriptEvents::PRE_INSTALL_CMD => [['execute', 50000]],
             ScriptEvents::PRE_UPDATE_CMD => [['execute', 50000]],
 
-            ScriptEvents::POST_INSTALL_CMD => [['modifyComposerLock', 50000]],
-            ScriptEvents::POST_UPDATE_CMD => [['modifyComposerLock', 50000]]
+            ScriptEvents::POST_INSTALL_CMD => [['modifyComposerLockPostInstall', 50000]],
+            ScriptEvents::POST_UPDATE_CMD => [['modifyComposerLockPostInstall', 50000]]
         ];
     }
 
@@ -66,6 +70,8 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
             return;
         }
 
+        $this->modifyComposerLock($this->shortedComposerHome, $this->composerHome);
+
         $azureRepositories = $this->parseRequiredPackages($this->composer);
         $azureRepositoriesWithDependencies = $this->fetchAzurePackages($azureRepositories);
         $this->addAzureRepositories($azureRepositoriesWithDependencies);
@@ -76,21 +82,24 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         return new FileHelper();
     }
 
-    public function modifyComposerLock(): void
+    public function modifyComposerLockPostInstall(): void
+    {
+        $this->modifyComposerLock($this->composerHome, $this->shortedComposerHome);
+    }
+
+    protected function modifyComposerLock(string $search, string $replaceWith): void
     {
         if (!$this->hasAzureRepositories) {
             return;
         }
 
-        $sedCommand = 'sed -i -e "s|${COMPOSER_HOME_PATH}|~/.composer|g" composer.lock';
+        $sedCommand = 'sed -i -e "s|' . $search . '|' . $replaceWith . '|g" composer.lock';
         // on macos sed needs an empty string for the i parameter
         if (strtolower(PHP_OS) === 'darwin') {
-            $sedCommand = 'sed -i "" -e "s|${COMPOSER_HOME_PATH}|~/.composer|g" composer.lock';
+            $sedCommand = 'sed -i "" -e "s|' . $search . '|' . $replaceWith . '|g" composer.lock';
         }
 
-        $command = 'COMPOSER_HOME_PATH=$(composer config --list --global | grep "\[home\]" | awk \'{print $2}\' | xargs) && ' . $sedCommand;
-
-        $this->executeShellCmd($command);
+        $this->executeShellCmd($sedCommand);
 
         $this->io->write('<info>Modified composer.lock path</info>');
     }
@@ -169,9 +178,10 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
             foreach ($artifacts as $artifact) {
                 $path = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, $organization, $feed, $artifact['name'], 'tmp']);
+                $finalPath = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]);
 
                 // continue if dir already exists and it is not empty
-                if (is_dir($path) && count(scandir($path)) > 2) {
+                if (is_dir($finalPath) && count(scandir($finalPath)) > 2) {
                     $this->io->write('<info>Package ' . $artifact['name'] . ' already downloaded</info>');
                 } else {
 
@@ -187,17 +197,18 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
                     $this->executeShellCmd($command);
 
                     $composer = $this->getComposer($path);
-                    $version = $composer->getPackage()->getPrettyVersion();
 
-                    $newPath = str_replace(DIRECTORY_SEPARATOR . 'tmp', DIRECTORY_SEPARATOR . $version, $path);
-                    $this->fileHelper->copyDirectory($path, $newPath);
+                    // set specific version of composer file in path
+                    $version = $composer->getPackage()->getPrettyVersion();
+                    $finalPath = str_replace(DIRECTORY_SEPARATOR . 'tmp', DIRECTORY_SEPARATOR . $version, $path);
+
+                    $this->fileHelper->copyDirectory($path, $finalPath);
                     $this->fileHelper->removeDirectory($path);
 
-                    $path = $newPath;
                     $this->io->write('<info>Package ' . $artifact['name'] . ' downloaded</info>');
                 }
 
-                $deps = $this->solveDependencies($path);
+                $deps = $this->solveDependencies($finalPath);
                 $azureRepositoriesWithDependencies = array_merge($azureRepositoriesWithDependencies, $deps);
 
             }
@@ -212,7 +223,7 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         exec($cmd, $output, $return_var);
 
         if ($return_var !== 0) {
-            throw new \Exception(implode("\n", $output));
+            throw new Exception(implode("\n", $output));
         }
     }
 
