@@ -15,20 +15,20 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 {
     protected Composer $composer;
     protected IOInterface $io;
-    protected string $cacheDir;
+    protected string $composerAzureCacheDir;
     public bool $hasAzureRepositories = true;
 
     protected FileHelper $fileHelper;
 
-    protected $composerHome = '';
-    protected $shortedComposerHome = '~/.composer';
+    protected string $composerCacheDir = '';
+    protected string $shortedComposerCacheDir = '~/.composer/cache';
 
     public function activate(Composer $composer, IOInterface $io)
     {
         $this->composer = $composer;
         $this->io = $io;
-        $this->cacheDir = str_replace(DIRECTORY_SEPARATOR, '/', $this->composer->getConfig()->get('cache-dir')) . '/azure';
-        $this->composerHome = $this->composer->getConfig()->get('home');
+        $this->composerCacheDir = (string)$this->composer->getConfig()->get('cache-dir');
+        $this->composerAzureCacheDir = $this->composerCacheDir . DIRECTORY_SEPARATOR . 'azure';
 
         $extra = $composer->getPackage()->getExtra();
         if (!isset($extra['azure-repositories']) || !is_array($extra['azure-repositories'])) {
@@ -70,7 +70,7 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
             return;
         }
 
-        $this->modifyComposerLock($this->shortedComposerHome, $this->composerHome);
+        $this->modifyComposerLock($this->shortedComposerCacheDir, $this->composerCacheDir);
 
         $azureRepositories = $this->parseRequiredPackages($this->composer);
         $azureRepositoriesWithDependencies = $this->fetchAzurePackages($azureRepositories);
@@ -84,12 +84,15 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
     public function modifyComposerLockPostInstall(): void
     {
-        $this->modifyComposerLock($this->composerHome, $this->shortedComposerHome);
+        $this->modifyComposerLock($this->composerCacheDir, $this->shortedComposerCacheDir);
     }
 
     protected function modifyComposerLock(string $search, string $replaceWith): void
     {
         if (!$this->hasAzureRepositories) {
+            return;
+        }
+        if (!is_file('composer.lock')) {
             return;
         }
 
@@ -157,7 +160,7 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
                 $repo = $this->composer->getRepositoryManager()->createRepository(
                     'path',
                     array(
-                        'url' => implode(DIRECTORY_SEPARATOR, [$this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
+                        'url' => implode(DIRECTORY_SEPARATOR, [$this->composerAzureCacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
                         'options' => ['symlink' => $symlink]
                     )
                 );
@@ -177,8 +180,8 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
             $artifacts = $azureRepository->getArtifacts();
 
             foreach ($artifacts as $artifact) {
-                $path = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, $organization, $feed, $artifact['name'], 'tmp']);
-                $finalPath = implode(DIRECTORY_SEPARATOR, [$this->cacheDir, $organization, $feed, $artifact['name'], $artifact['version']]);
+                $path = implode(DIRECTORY_SEPARATOR, [$this->composerAzureCacheDir, $organization, $feed, $artifact['name'], 'tmp']);
+                $finalPath = implode(DIRECTORY_SEPARATOR, [$this->composerAzureCacheDir, $organization, $feed, $artifact['name'], $artifact['version']]);
 
                 // continue if dir already exists and it is not empty
                 if (is_dir($finalPath) && count(scandir($finalPath)) > 2) {
