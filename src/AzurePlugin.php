@@ -6,6 +6,7 @@ use Composer\Composer;
 use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\Factory;
 use Composer\IO\IOInterface;
+use Composer\Package\Loader\ArrayLoader;
 use Composer\Plugin\Capable;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\ScriptEvents;
@@ -15,20 +16,18 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 {
     protected Composer $composer;
     protected IOInterface $io;
-    protected string $composerAzureCacheDir;
     public bool $hasAzureRepositories = true;
 
     protected FileHelper $fileHelper;
 
     protected string $composerCacheDir = '';
-    protected string $shortedComposerCacheDir = '~/.composer/cache';
+    protected string $shortedComposerCacheDir = '~/.composer/cache/azure';
 
     public function activate(Composer $composer, IOInterface $io)
     {
         $this->composer = $composer;
         $this->io = $io;
-        $this->composerCacheDir = (string)$this->composer->getConfig()->get('cache-dir');
-        $this->composerAzureCacheDir = $this->composerCacheDir . DIRECTORY_SEPARATOR . 'azure';
+        $this->composerCacheDir = (string)$this->composer->getConfig()->get('cache-dir') . DIRECTORY_SEPARATOR . 'azure';
 
         $extra = $composer->getPackage()->getExtra();
         if (!isset($extra['azure-repositories']) || !is_array($extra['azure-repositories'])) {
@@ -71,6 +70,8 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
         }
 
         $this->modifyComposerLock($this->shortedComposerCacheDir, $this->composerCacheDir);
+
+        sleep(1);
 
         $azureRepositories = $this->parseRequiredPackages($this->composer);
         $azureRepositoriesWithDependencies = $this->fetchAzurePackages($azureRepositories);
@@ -160,12 +161,16 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
                 $repo = $this->composer->getRepositoryManager()->createRepository(
                     'path',
                     array(
-                        'url' => implode(DIRECTORY_SEPARATOR, [$this->composerAzureCacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
+                        'url' => implode(DIRECTORY_SEPARATOR, [$this->composerCacheDir, $organization, $feed, $artifact['name'], $artifact['version']]),
                         'options' => ['symlink' => $symlink]
                     )
                 );
                 $this->composer->getRepositoryManager()->addRepository($repo);
             }
+        }
+
+        if (is_file('composer.lock')) {
+            $this->adjustPathInComposerLocker();
         }
     }
 
@@ -180,14 +185,13 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
             $artifacts = $azureRepository->getArtifacts();
 
             foreach ($artifacts as $artifact) {
-                $path = implode(DIRECTORY_SEPARATOR, [$this->composerAzureCacheDir, $organization, $feed, $artifact['name'], 'tmp']);
-                $finalPath = implode(DIRECTORY_SEPARATOR, [$this->composerAzureCacheDir, $organization, $feed, $artifact['name'], $artifact['version']]);
+                // This have to change if we support versions with wildcards like ~ ^ or *
+                $artifactPath = implode(DIRECTORY_SEPARATOR, [$this->composerCacheDir, $organization, $feed, $artifact['name'], $artifact['version']]);
 
-                // continue if dir already exists and it is not empty
-                if (is_dir($finalPath) && count(scandir($finalPath)) > 2) {
+                // don't download if dir already exists and it is not empty
+                if (is_dir($artifactPath) && count(scandir($artifactPath)) > 2) {
                     $this->io->write('<info>Package ' . $artifact['name'] . ' already downloaded</info>');
                 } else {
-
                     $command = 'az artifacts universal download';
                     $command .= ' --organization ' . 'https://' . $organization;
                     $command .= ' --project "' . $project . '"';
@@ -195,23 +199,14 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
                     $command .= ' --feed ' . $feed;
                     $command .= ' --name ' . str_replace('/', '.', $artifact['name']);
                     $command .= ' --version \'' . $artifact['version'] . '\'';
-                    $command .= ' --path ' . $path;
+                    $command .= ' --path ' . $artifactPath;
 
                     $this->executeShellCmd($command);
-
-                    $composer = $this->getComposer($path);
-
-                    // set specific version of composer file in path
-                    $version = $composer->getPackage()->getPrettyVersion();
-                    $finalPath = str_replace(DIRECTORY_SEPARATOR . 'tmp', DIRECTORY_SEPARATOR . $version, $path);
-
-                    $this->fileHelper->copyDirectory($path, $finalPath);
-                    $this->fileHelper->removeDirectory($path);
 
                     $this->io->write('<info>Package ' . $artifact['name'] . ' downloaded</info>');
                 }
 
-                $deps = $this->solveDependencies($finalPath);
+                $deps = $this->solveDependencies($artifactPath);
                 $azureRepositoriesWithDependencies = array_merge($azureRepositoriesWithDependencies, $deps);
 
             }
@@ -243,5 +238,38 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
     {
         $factory = new Factory();
         return $factory->createComposer($this->io, implode(DIRECTORY_SEPARATOR, [$path, Factory::getComposerFile()]));
+    }
+
+    protected function adjustPathInComposerLocker(): void
+    {
+        $locker = $this->composer->getLocker();
+        $lockData = $locker->getLockData();
+        $loader = new ArrayLoader(null, true);
+        $packages = [];
+        foreach ($lockData['packages'] as $i => $package) {
+            $packageToLock = $loader->load($package);
+            if ($packageToLock->getDistType() === 'path') {
+                $packageToLock->setDistUrl(str_replace($this->shortedComposerCacheDir, $this->composerCacheDir, $package['dist']['url']));
+            }
+            $packages[] = $packageToLock;
+        }
+        $packagesDev = [];
+        foreach ($lockData['packages-dev'] as $i => $package) {
+            $packageToLock = $loader->load($package);
+            $packagesDev[] = $packageToLock;
+        }
+
+        $locker->setLockData(
+            $packages,
+            $packagesDev,
+            $lockData['platform'],
+            $lockData['platform-dev'],
+            $lockData['aliases'],
+            $lockData['minimum-stability'],
+            $lockData['stability-flags'],
+            $lockData['prefer-stable'],
+            $lockData['prefer-lowest'],
+            []
+        );
     }
 }

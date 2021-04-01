@@ -6,7 +6,6 @@ use Composer\IO\IOInterface;
 use Composer\Script\ScriptEvents;
 use MarvinCaspar\Composer\AzurePlugin;
 use MarvinCaspar\Composer\AzureRepository;
-use MarvinCaspar\Composer\FileHelper;
 use PHPUnit\Framework\TestCase;
 
 final class AzurePluginTest extends TestCase
@@ -27,8 +26,7 @@ final class AzurePluginTest extends TestCase
         $this->composerWithAzureRepos = $factory->createComposer($this->ioMock, implode(DIRECTORY_SEPARATOR, ['./tests', 'composer-with-azure-repo.json']));
         $this->composerWithoutAzureRepos = $factory->createComposer($this->ioMock, implode(DIRECTORY_SEPARATOR, ['./tests', 'composer-without-azure-repo.json']));
 
-        $this->cacheDir = (string)$this->composerWithAzureRepos->getConfig()->get('cache-dir');
-        $this->azureCacheDir = $this->cacheDir . DIRECTORY_SEPARATOR . 'azure';
+        $this->cacheDir = (string)$this->composerWithAzureRepos->getConfig()->get('cache-dir') . DIRECTORY_SEPARATOR . 'azure';
     }
 
     public function testGetCapabilities(): void
@@ -88,40 +86,6 @@ final class AzurePluginTest extends TestCase
         $azurePlugin->execute();
     }
 
-    public function testExecuteWithoutInternalMocks()
-    {
-        $azureRepo = new AzureRepository('dev.azure.com/vendor', 'project', 'feed', false);
-        $azureRepo->addArtifact('vendor/azure-package', '1.0.0');
-
-        $azurePlugin = $this->getMockBuilder(AzurePlugin::class)
-            ->onlyMethods(['executeShellCmd', 'solveDependencies', 'getComposer', 'getFileHelper'])
-            ->getMock();
-        $azurePlugin->activate($this->composerWithAzureRepos, $this->ioMock);
-
-        $pathTmp = implode(DIRECTORY_SEPARATOR, [$this->azureCacheDir, 'dev.azure.com/vendor', 'feed', 'vendor/azure-package', 'tmp']);
-        $pathVersion = implode(DIRECTORY_SEPARATOR, [$this->azureCacheDir, 'dev.azure.com/vendor', 'feed', 'vendor/azure-package', '1.0.0']);
-        // $azurePlugin->expects($this->once())
-        //     ->method('executeShellCmd')
-        //     ->with('az artifacts universal download --organization https://dev.azure.com/vendor --project "project" --scope project --feed feed --name vendor.azure-package --version \'1.0.0\' --path ' . $pathTmp);
-
-        $azurePlugin->expects($this->once())
-            ->method('getComposer')
-            ->willReturn($this->composerWithAzureRepos);
-
-        $azurePlugin->expects($this->once())
-            ->method('solveDependencies')
-            ->with($pathVersion)
-            ->willReturn([]);
-
-        $helperMock = $this->getMockBuilder(FileHelper::class)
-            ->getMock();
-        $azurePlugin->expects($this->once())
-            ->method('getFileHelper')
-            ->willReturn($helperMock);
-
-        $azurePlugin->execute();
-    }
-
     public function testExecuteWithoutAzureReposAndInternalMocks()
     {
         $azureRepo = new AzureRepository('dev.azure.com/vendor', 'project', 'feed', false);
@@ -143,10 +107,10 @@ final class AzurePluginTest extends TestCase
 
     public function testModifyComposerLockWithAzureRepos()
     {
-        $sedCommand = 'sed -i -e "s|' . $this->cacheDir . '|~/.composer/cache|g" composer.lock';
+        $sedCommand = 'sed -i -e "s|' . $this->cacheDir . '|~/.composer/cache/azure|g" composer.lock';
         // on macos sed needs an empty string for the i parameter
         if (strtolower(PHP_OS) === 'darwin') {
-            $sedCommand = 'sed -i "" -e "s|' . $this->cacheDir . '|~/.composer/cache|g" composer.lock';
+            $sedCommand = 'sed -i "" -e "s|' . $this->cacheDir . '|~/.composer/cache/azure|g" composer.lock';
         }
 
         $azurePlugin = $this->getMockBuilder(AzurePlugin::class)
