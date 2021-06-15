@@ -71,8 +71,6 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
         $this->modifyComposerLock($this->shortedComposerCacheDir, $this->composerCacheDir);
 
-        sleep(1);
-
         $azureRepositories = $this->parseRequiredPackages($this->composer);
         $azureRepositoriesWithDependencies = $this->fetchAzurePackages($azureRepositories);
         $this->addAzureRepositories($azureRepositoriesWithDependencies);
@@ -152,6 +150,7 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
     protected function addAzureRepositories(array $azureRepositories)
     {
+        /** @var AzureRepository $azureRepository */
         foreach ($azureRepositories as $azureRepository) {
             $organization = $azureRepository->getOrganization();
             $feed = $azureRepository->getFeed();
@@ -177,16 +176,30 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
     protected function downloadAzureArtifacts(array $azureRepositories): array
     {
         $azureRepositoriesWithDependencies = $azureRepositories;
-        foreach ($azureRepositories as $azureRepository) {
+        /** @var AzureRepository $azureRepository */
+        foreach ($azureRepositories as $repoIndex => $azureRepository) {
             $organization = $azureRepository->getOrganization();
             $project = $azureRepository->getProject();
             $scope = $azureRepository->getScope();
             $feed = $azureRepository->getFeed();
             $artifacts = $azureRepository->getArtifacts();
 
-            foreach ($artifacts as $artifact) {
+            foreach ($artifacts as $artifactIndex => $artifact) {
+                if (substr($artifact['version'], 0, 4) === "dev-") {
+                    continue;
+                }
+
                 // This have to change if we support versions with wildcards like ~ ^ or *
-                $artifactPath = implode(DIRECTORY_SEPARATOR, [$this->composerCacheDir, $organization, $feed, $artifact['name'], $artifact['version']]);
+                $artifactPath = implode(
+                    DIRECTORY_SEPARATOR,
+                    [
+                        $this->composerCacheDir,
+                        $organization,
+                        $feed,
+                        $artifact['name'],
+                        $this->simplifyVersion($artifact['version'])
+                    ]
+                );
 
                 // don't download if dir already exists and it is not empty
                 if (is_dir($artifactPath) && count(scandir($artifactPath)) > 2) {
@@ -202,6 +215,25 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
                     $command .= ' --path ' . $artifactPath;
 
                     $this->executeShellCmd($command);
+
+                    if ($this->isWildcardVersion($artifact['version'])) {
+                        $composer = $this->getComposer($artifactPath);
+                        $newArtifactPath = implode(
+                            DIRECTORY_SEPARATOR,
+                            [
+                                $this->composerCacheDir,
+                                $organization,
+                                $feed,
+                                $artifact['name'],
+                                $composer->getPackage()->getPrettyVersion()
+                            ]
+                        );
+                        $this->getFileHelper()->copyDirectory($artifactPath, $newArtifactPath);
+                        $this->getFileHelper()->removeDirectory($artifactPath);
+                        $artifactPath = $newArtifactPath;
+
+                        $azureRepositoriesWithDependencies[$repoIndex]->updateArtifactVersion($artifactIndex, $composer->getPackage()->getPrettyVersion());
+                    }
 
                     $this->io->write('<info>Package ' . $artifact['name'] . ' downloaded</info>');
                 }
@@ -242,6 +274,7 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
 
     protected function adjustPathInComposerLocker(): void
     {
+        $this->io->write('<info>Reload composer lock</info>');
         $locker = $this->composer->getLocker();
         $lockData = $locker->getLockData();
         $loader = new ArrayLoader(null, true);
@@ -254,7 +287,7 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
             $packages[] = $packageToLock;
         }
         $packagesDev = [];
-        foreach ($lockData['packages-dev'] as $i => $package) {
+        foreach ($lockData['packages-dev'] as $package) {
             $packageToLock = $loader->load($package);
             $packagesDev[] = $packageToLock;
         }
@@ -272,4 +305,28 @@ class AzurePlugin implements PluginInterface, EventSubscriberInterface, Capable
             []
         );
     }
+
+    protected function simplifyVersion(string $version): string
+    {
+        if ($this->endsWith($version, '*')) {
+            return str_replace('*', '9999', $version);
+        }
+
+        return $version;
+    }
+
+    protected function isWildcardVersion(string $version): bool
+    {
+        return $this->endsWith($version, '*');
+    }
+
+    private function endsWith(string $haystack, string $needle): bool
+    {
+        $length = strlen($needle);
+        if (!$length) {
+            return true;
+        }
+        return substr($haystack, -$length) === $needle;
+    }
+
 }

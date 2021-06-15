@@ -53,6 +53,11 @@ class AzureRepository
         ];
     }
 
+    public function updateArtifactVersion(int $index, string $version): void
+    {
+        $this->artifacts[$index]['version'] =  $version;
+    }
+
     public function getArtifacts(): array
     {
         return $this->artifacts;
