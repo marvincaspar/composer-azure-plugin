@@ -14,7 +14,7 @@ $ composer global require marvincaspar/composer-azure-plugin
 ```
 
 You have to be logged in via
-the [Azure command line interface](https://docs.microsoft.com/fr-fr/cli/azure/?view=azure-cli-latest).
+the [Azure command line interface](https://docs.microsoft.com/de-de/cli/azure/install-azure-cli-linux?pivots=apt#sign-in-to-azure-with-the-azure-cli).
 
 ## Usage
 
